@@ -119,6 +119,7 @@ std::vector<Timbre> SoundBank = {
   Timbre("PopSynth/CHORD-INTRO", {51, 63, 66, 70, 73}),
   Timbre("PopSynth/CHORD-WIRE", {51, 63, 66, 70, 73}),
   Timbre("PopSynth/HOUSEPIANO", {51, 63, 66, 70, 73}),
+  Timbre("PopSynth/SITAR", {51}),
   Timbre("PopSynth/LOGBASS", {32, 39, 42, 44, 48, 49, 56, 58}),
 };
 

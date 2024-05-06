@@ -204,8 +204,9 @@ std::vector<Patch*> SoundBank = {
   /* 17 */ new Timbre("PopSynth/CHORD-INTRO", {51, 63, 66, 70, 73}),
   /* 18 */ new Timbre("PopSynth/CHORD-WIRE", {51, 63, 66, 70, 73}),
   /* 19 */ new Timbre("PopSynth/HOUSEPIANO", {51, 63, 66, 70, 73}),
-  /* 20 */ new Timbre("PopSynth/LOGBASS", {32, 39, 42, 44, 48, 49, 56, 58}),
-  /* 21 */ &drumKit
+  /* 20 */ new Timbre("PopSynth/SITAR", {51}),
+  /* 21 */ new Timbre("PopSynth/LOGBASS", {32, 39, 42, 44, 48, 49, 56, 58}),
+  /* 22 */ &drumKit
 };
 
 class PCMEnv : public SynthVoice
