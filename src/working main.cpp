@@ -125,11 +125,14 @@ std::vector<Timbre> SoundBank = {
   // Timbre("PopSynth/SITAR-test", {51}),
   // Timbre("PopSynth/LOGBASS", {32, 39, 42, 44, 48, 49, 56, 58}),
 
+  // Test:
+  // change midi notes to frequencies
+  // sa -> g# 
   /* 00 */ Timbre("Indian/SITAR", {60}), // Sa (C4)
   /* 01 */ Timbre("Indian/SITAR", {60, 67}), // Sa (C4), Pa (G4)
   /* 02 */ Timbre("Indian/SITAR", {60, 67, 72}), // Sa (C4), Pa (G4), High Sa (C5)
   /* 03 */ Timbre("Indian/SITAR", {60, 62, 64, 65, 67, 69, 71, 72}), // Sa, Re, Ga, Ma, Pa, Dha, Ni, Sa = C4, D4, E4, F4, G4, A4, B4, C5
-  /* 04 */ Timbre("Indian/Sitar", {54, 55, 57, 60}) // Pa, Dha, Ni, Sa
+  /* 04 */ Timbre("Indian/Sitar", {54, 55, 57, 60})
 };
 
 class PCMEnv : public SynthVoice
@@ -138,9 +141,6 @@ public:
   gam::Pan<> mPan;
   gam::Sine<> mOsc;
   gam::Env<3> mAmpEnv;
-  gam::EnvFollow<> mEnvFollow;
-  Mesh mMesh;
-  float mAmp;
 
   float attenuation = 0;
   float rate = 0;
@@ -151,17 +151,13 @@ public:
 
   void init() override
   {
-
-    mAmp = 1;
     // Intialize envelope
     mAmpEnv.curve(0); // make segments lines
     mAmpEnv.levels(0, 1, 1, 0);
     mAmpEnv.sustainPoint(2);
 
     // Set up parameters
-    addDisc(mMesh, 1.0, 30);
     createInternalTriggerParameter("timbre", 0, 0, SoundBank.size() - 1);
-    createInternalTriggerParameter("frequency", 60, 29, 5000);
     createInternalTriggerParameter("amplitude", 1, 0.0, 8.0);
     createInternalTriggerParameter("midiNote", 1, 0, 127);
     createInternalTriggerParameter("attackTime", 2, 0.001, 3.0);
@@ -191,11 +187,10 @@ public:
     bool interpolate = getInternalParameterValue("interpolate");
     mAmpEnv.lengths()[0] = getInternalParameterValue("attackTime");
     mAmpEnv.lengths()[2] = getInternalParameterValue("releaseTime");
-    
+    mPan.pos(getInternalParameterValue("pan"));
     
     while (io())
     {
-      mPan.pos(getInternalParameterValue("pan"));
       float s1 = 0;
       float s2;
 
@@ -221,8 +216,8 @@ public:
       mPan(s1, s1, s2);
 
       // Output
-      io.out(0) += s1;
-      io.out(1) += s2;
+      io.out(0) = s1;
+      io.out(1) = s2;
 
       if (position >= sampleLength || mAmpEnv.done()) {
         free();
@@ -235,20 +230,6 @@ public:
     setInternalParameterValue("timbre", timbre);
     setInternalParameterValue("midiNote", midiNote);
     setInternalParameterValue("amplitude", amplitude);
-  }
-
-  virtual void onProcess(Graphics &g) {
-    float frequency = getInternalParameterValue("frequency");
-    float amplitude = getInternalParameterValue("amplitude");
-    g.pushMatrix();
-    g.translate(amplitude,  amplitude, -10);
-    //g.scale(frequency/2000, frequency/4000, 1);
-    float scaling = 0.5;
-    g.scale(scaling * frequency/200, scaling * frequency/400, scaling* 1);
-    // g.color(mEnvFollow.value(), frequency/1000, mEnvFollow.value()* 10, 0.4);
-    g.color(1.0, frequency/1000, 0.0, 0.5);
-    g.draw(mMesh);
-    g.popMatrix();
   }
 
   void onTriggerOn() override {
@@ -286,50 +267,76 @@ public:
 class MyApp : public App
 {
 public:
-  SynthGUIManager<PCMEnv> synthManager{"PCMEnv"};
   int octaveShift = 0;
 
-  virtual void onInit( ) override {
-    imguiInit();
-    navControl().active(false);  // Disable navigation via keyboard, since we
-                              // will be using keyboard for note triggering
+  // GUI manager for SineEnv voices
+  // The name provided determines the name of the directory
+  // where the presets and sequences are stored
+  SynthGUIManager<PCMEnv> synthManager{"PCMEnv"};
+
+  // This function is called right after the window is created
+  // It provides a grphics context to initialize ParameterGUI
+  // It's also a good place to put things that should
+  // happen once at startup.
+  void onCreate() override
+  {
+    navControl().active(false); // Disable navigation via keyboard, since we
+                                // will be using keyboard for note triggering
+
     // Set sampling rate for Gamma objects from app's audio
     gam::sampleRate(audioIO().framesPerSecond());
+
+    imguiInit();
+
+    // Play example sequence. Comment this line to start from scratch
+    // synthManager.synthSequencer().playSequence("synth1.synthSequence");
+    synthManager.synthRecorder().verbose(true);
   }
 
-    void onCreate() override {
-        // Play example sequence. Comment this line to start from scratch
-        //    synthManager.synthSequencer().playSequence("synth8.synthSequence");
-        synthManager.synthRecorder().verbose(true);
-    }
+  
 
-    void onSound(AudioIOData& io) override {
-        synthManager.render(io);  // Render audio
-    }
+  // The audio callback function. Called when audio hardware requires data
+  void onSound(AudioIOData &io) override
+  {
+    synthManager.render(io); // Render audio
+  }
 
-    void onAnimate(double dt) override {
-        imguiBeginFrame();
-        synthManager.drawSynthControlPanel();
-        imguiEndFrame();
-    }
+  void onAnimate(double dt) override
+  {
+    // The GUI is prepared here
+    imguiBeginFrame();
+    // Draw a window that contains the synth control panel
+    synthManager.drawSynthControlPanel();
+    imguiEndFrame();
+  }
 
-    void onDraw(Graphics& g) override {
-        g.clear();
-        synthManager.render(g);
+  // The graphics callback function.
+  void onDraw(Graphics &g) override
+  {
+    g.clear();
+    // Render the synth's graphics
+    synthManager.render(g);
 
-        // Draw GUI
-        imguiDraw();
-    }
+    // GUI is drawn here
+    imguiDraw();
+  }
 
-    bool onKeyDown(Keyboard const& k) override {
-      if (ParameterGUI::usingKeyboard()) {  // Ignore keys if GUI is using them
+  // Whenever a key is pressed, this function is called
+  bool onKeyDown(Keyboard const &k) override
+  {
+    if (ParameterGUI::usingKeyboard())
+    { // Ignore keys if GUI is using
+      // keyboard
       return true;
-      }
-      if (k.shift()) {
+    }
+    if (k.shift())
+    {
       // If shift pressed then keyboard sets preset
       int presetNumber = asciiToIndex(k.key());
       synthManager.recallPreset(presetNumber);
-      } else {
+    }
+    else
+    {
       // If - or = pressed change octave
       if (k.key() == '-')
       {
@@ -339,28 +346,33 @@ public:
       {
         octaveShift++;
       }
-      // Otherwise trigger note for polyphonic synth
-      int midiNote = asciiToMIDI(k.key(), octaveShift * 12);
-      if (midiNote > 0) {
-        synthManager.voice()->setInternalParameterValue(
-          "frequency", ::pow(2.f, (midiNote - 69.f) / 12.f) * 432.f);
-        synthManager.voice()->setInternalParameterValue(
+      else
+      {
+        // Otherwise trigger note for polyphonic synth
+        int midiNote = asciiToMIDI(k.key(), octaveShift * 12);
+        if (midiNote > 0)
+        {
+          synthManager.voice()->setInternalParameterValue(
               "midiNote", midiNote);
-        synthManager.triggerOn(midiNote);
+          synthManager.triggerOn(midiNote);
+        }
       }
-      }
-      return true;
     }
+    return true;
+  }
 
-    bool onKeyUp(Keyboard const& k) override {
-      int midiNote = asciiToMIDI(k.key(), octaveShift * 12);
-      if (midiNote > 0) {
+  // Whenever a key is released this function is called
+  bool onKeyUp(Keyboard const &k) override
+  {
+    int midiNote = asciiToMIDI(k.key(), octaveShift * 12);
+    if (midiNote > 0)
+    {
       synthManager.triggerOff(midiNote);
-      }
-      return true;
     }
+    return true;
+  }
 
-      void onExit() override { imguiShutdown(); }
+  void onExit() override { imguiShutdown(); }
 };
 
 int main()
